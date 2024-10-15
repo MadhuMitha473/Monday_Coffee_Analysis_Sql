@@ -1,0 +1,185 @@
+#Q1
+SELECT 
+    city_name,
+    ROUND((population * 0.25) / 1000000, 2) AS Coffee_consumer,
+    city_rank
+FROM
+    new_coffee.city
+ORDER BY population DESC;
+
+#Q2
+SELECT 
+    SUM(total) AS Total_Sales
+FROM
+    new_coffee.sales
+WHERE
+    YEAR(sale_date) = 2023
+        AND EXTRACT(QUARTER FROM sale_date) = 4;
+
+#Q3
+SELECT 
+    p.product_name,
+    COUNT(s.sale_id)AS Num_of_Sold
+FROM
+    new_coffee.products p
+        LEFT JOIN
+    new_coffee.sales s ON p.product_id = s.product_id
+GROUP BY product_name
+ORDER BY COUNT(s.sale_id) DESC;
+
+#Q4
+SELECT 
+    c.city_name,
+    COUNT(DISTINCT r.customer_id) AS Total_customer,
+    SUM(s.total) AS Revenue,
+    ROUND(SUM(s.total) / COUNT(DISTINCT r.customer_id)) AS Avg_Sale_Per_Customer
+FROM
+    city c
+        JOIN
+    customers r ON c.city_id = r.city_id
+        JOIN
+    sales s ON r.customer_id = s.customer_id
+GROUP BY c.city_name;
+
+#Q5
+with cte as
+(
+SELECT city_name,
+ROUND((population * 0.25)/1000000,2) as coffee_consumer from new_coffee.city
+),customer as
+(
+SELECT 
+    c1.city_name,
+    COUNT(DISTINCT t.customer_id) AS Total_customer
+FROM
+    new_coffee.customers t
+JOIN 
+ new_coffee.city c1 ON t.city_id=c1.city_id
+GROUP BY city_name 
+)
+SELECT 
+    ct.city_name, cr.Total_customer, ct.coffee_consumer
+FROM
+    cte ct
+        JOIN
+    customer cr ON ct.city_name = cr.city_name;
+
+#Q6
+SELECT  * FROM
+(SELECT 
+    c.city_name,
+    p.product_name,
+    COUNT(s.sale_id)AS sales_volume,
+    dense_rank () over(partition by c.city_name order by count(s.sale_id) desc) AS ranks
+FROM
+    new_coffee.sales s
+        JOIN
+    new_coffee.products p ON s.product_id = p.product_id
+        JOIN
+    new_coffee.customers t ON s.customer_id = t.customer_id
+        JOIN
+    new_coffee.city c ON t.city_id = c.city_id
+GROUP BY c.city_name , p.product_name
+ORDER BY city_name , COUNT(sale_id) DESC) as t1 
+WHERE ranks <=3;
+
+#Q7
+SELECT 
+    c.city_name,
+    COUNT(DISTINCT t.customer_id) AS Customer_Purchase_Coffee
+FROM
+    new_coffee.city c
+        JOIN
+    customers t ON c.city_id = t.city_id
+        JOIN
+    sales s ON t.customer_id = s.customer_id
+        JOIN
+    products p ON s.product_id = p.product_id
+WHERE
+    p.product_id BETWEEN 1 AND 14
+GROUP BY c.city_name;
+
+
+#Q8
+with cte as(SELECT 
+    c.city_name,
+    COUNT(DISTINCT t.customer_id) as customer,
+    ROUND(SUM(s.total) / (COUNT(DISTINCT t.customer_id))) AS avg_sale_per_customer,
+    c.estimated_rent as rent
+FROM
+    city c
+        JOIN
+    customers t ON c.city_id = t.city_id
+        JOIN
+    sales s ON t.customer_id = s.customer_id
+GROUP BY c.city_name,c.estimated_rent )
+SELECT ct.city_name ,ct.customer,ct.avg_sale_per_customer,ct.rent,
+ROUND(ct.rent/ct.customer) as avg_rent_per_customer
+FROM cte ct;
+
+#Q9
+with monthly_sales as (SELECT 
+    c.city_name,
+    MONTH(s.sale_date) AS month,
+    YEAR(s.sale_date) AS year,
+    SUM(s.total) AS month_sale
+FROM
+    city c
+        JOIN
+    customers t ON c.city_id = t.city_id
+        JOIN
+    sales s ON t.customer_id = s.customer_id
+GROUP BY  
+c.city_name,MONTH(s.sale_date),YEAR(s.sale_date)
+ORDER BY
+city_name,YEAR(s.sale_date),MONTH(s.sale_date)),
+growth_ratio as
+(
+SELECT ms.city_name,ms.month,ms.year,ms.month_sale AS current_month_sale,
+lag(month_sale,1) over(partition by city_name) AS last_month_sale
+FROM
+monthly_sales ms)
+SELECT
+    gr.city_name,gr.month,gr.year,gr.current_month_sale,gr.last_month_sale,
+     round((gr.current_month_sale-gr.last_month_sale)/gr.last_month_sale * 100,2) AS growth_ratio
+FROM
+growth_ratio gr
+WHERE last_month_sale is not null;
+
+
+#Q10
+with cte as(SELECT 
+    c.city_name,
+    sum(total) as total_sale,
+    round((c.population * 0.25)/1000000,2) as population,
+    COUNT(DISTINCT t.customer_id) as customer,
+    ROUND(SUM(s.total) / (COUNT(DISTINCT t.customer_id))) AS avg_sale_per_customer,
+    c.estimated_rent as rent
+    
+FROM
+    city c
+        JOIN
+    customers t ON c.city_id = t.city_id
+        JOIN
+    sales s ON t.customer_id = s.customer_id
+GROUP BY 
+c.city_name,c.estimated_rent,c.population )
+SELECT 
+    ct.city_name,
+    ct.total_sale,
+    ct.customer,
+    ct.rent AS total_rent,
+    population AS est_coffee_consumer,
+    ct.avg_sale_per_customer,
+    ROUND(ct.rent/ct.customer) as avg_rent_per_customer
+FROM cte ct 
+ORDER BY 
+total_sale desc
+
+
+
+
+
+
+
+
